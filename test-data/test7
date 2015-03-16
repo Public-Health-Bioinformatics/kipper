@@ -1,0 +1,9 @@
+1	this is first line
+3a	potentially a misordered insert within file
+3b	and another one
+3	this is third line changed
+4	this is a new last line
+1a1	addendum to first line
+1aa1	another addendum
+10	new last line
+1a10	inserted right?

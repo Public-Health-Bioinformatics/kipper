@@ -1,0 +1,12 @@
+1		1	this is first line
+5		1a1	addendum to first line
+7		1a10	inserted right?
+5		1aa1	another addendum
+1	2	2	this is second line
+3	6	2	this is second line reinserted
+1	4	3	this is third line
+4		3	this is third line changed
+6		3a	potentially a misordered insert within file
+6		3b	and another one
+4		4	this is a new last line
+5		10	new last line
