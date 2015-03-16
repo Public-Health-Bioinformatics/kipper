@@ -1,11 +1,11 @@
-= Using Command-line Kipper =
+## Using Command-line Kipper
 
 The basic command-line file versioning solution we have created primarily for fasta data, called **Kipper**, is a key-value data store that keeps track of when particular items are inserted or deleted (updates are deletes followed by inserts).  It can recall versions by date or version id.  It can keep versions in one or more volume files.  It currently only accepts two kinds of text file input : 
 
 * "text": any file where each row is a tab/space delimited key-value record.
 * "fasta" database.
 
-> **Usage**
+### **Usage**
  
 By default, all outputs go to stdout and affect no change in Kipper database files unless the '-o' parameter is supplied.  Thus by default one sees what would happen if an action were taken, but must take an additional step to affect the data store.  The exception to this is with the -M regenerate metadata command described below. 
 
@@ -70,7 +70,7 @@ Return version of the kipper code:	 -v --version
 
     kipper.py -v
 
-> **Options**
+### **Options**
 
   -h, --help
 	
@@ -124,7 +124,7 @@ Return version of the kipper code:	 -v --version
   
 	Provide a version id to extract or revert to.
 
-> **Performance**
+### **Performance**
 
 Kipper has virtually no memory requirements, regardless of the size of input files.  Since fasta databases are mainly just inserts over time, a Kipper data store having many versions usually ends up being modestly larger than the most recent fasta database version size.  Its version extraction speed is linear to the time it take to read and write the archive file.
 
