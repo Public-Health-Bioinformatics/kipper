@@ -31,7 +31,7 @@ Items in *italics* are not currently implemented.
 | volumes | yes | Table of volumes (see below).  Each volume contains a range of versions, starting with a complete version file that subsequent versions diff off of.
  | | | 
 
-### Volume
+#### Volume
 | field | required | description |
 |-------|----------|-------------|
 |floor_id | yes | Lowest version id that this volume pertains to.  It covers this id and all up to next volume's floor_id |
@@ -39,7 +39,7 @@ Items in *italics* are not currently implemented.
 | *prefixes* | *no* | *... keep track of the rows and hash of each prefix file?* |
  | | | 
  
-### Version
+#### Version
  
 | field | description |
 | ----- | ------------- |
