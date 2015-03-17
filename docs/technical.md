@@ -62,8 +62,10 @@ In a volume each line of data contains 1 key-value record transaction, either an
 
 A kipper key-value record consists of:
 
- | creation version id | deletion version id | key (text) | value (text) |
- | ---------------------- | ---------------------- | ----------- | -------------- |
+||||||
+|-|-|-|-| 
+| creation version id | deletion version id | key (text) | value(text) |
+||||||
 
 e.g.
 
