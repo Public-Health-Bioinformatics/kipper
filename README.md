@@ -3,16 +3,16 @@
 The basic command-line file versioning solution we have created primarily for fasta data, called **Kipper**, is a key-value data store that keeps track of when particular items are inserted or deleted (updates are deletes followed by inserts).  It can recall versions by date or version id.  It can keep versions in one or more volume files.  It currently only accepts two kinds of text file input : 
 
 * "text": any file where each row is a tab/space delimited key-value record.
-* "fasta" database.
+* "fasta" database, see http://en.wikipedia.org/wiki/FASTA_format
 
 ### **Usage**
  
-By default, all outputs go to stdout and affect no change in Kipper database files unless the '-o' parameter is supplied.  Thus by default one sees what would happen if an action were taken, but must take an additional step to affect the data store.  The exception to this is with the -M regenerate metadata command described below. 
+By default, all outputs go to stdout and affect no change in Kipper data store files unless the output '-o' parameter is given with a data store file as the output target.  Thus by default one sees what would happen if an action were taken, but must take an additional step to affect the data store.  The exception to this is with the -M regenerate metadata command described below. 
 
-If you include a period in the "-o ." parameter, rather than a file name, this simply allows Kipper to select the output file name as appropriate, namely:
+If you include a period in the "-o ." parameter, rather than a file name, this simply allows Kipper to select the default output file name as appropriate, namely:
 
 **"-o ." is a special parameter that leads to:**
-   **an update of the .kipper database for --import or --revert actions**
+   **an update of the .kipper data store for --import or --revert actions**
    **a save of output to file specified in the data store's .md metadata file for -e --extract action**
 
 As well, when -o parameter is a path, and not a specific filename, then kipper.py looks up what the appropriate output file name is according to the metadata file.
@@ -20,7 +20,7 @@ As well, when -o parameter is a path, and not a specific filename, then kipper.p
 
 List versions of dbFile key/value pairs (by date/time): -l --list (optional)
 
-	kipper.py [database file]
+	kipper.py [data store file]
 	kipper.py cpn60 -l
 
 Initialize metadata file and kipper file: -M --rebuild
@@ -128,4 +128,4 @@ Return version of the kipper code:	 -v --version
 
 Kipper has virtually no memory requirements, regardless of the size of input files.  Since fasta databases are mainly just inserts over time, a Kipper data store having many versions usually ends up being modestly larger than the most recent fasta database version size.  Its version extraction speed is linear to the time it take to read and write the archive file.
 
-Currently we are experimenting with reading compressed files and writing compressed volume files, to see which solution is fastest.
+Currently we are experimenting with reading compressed files and writing compressed volume files, to see which archiving format is best.
