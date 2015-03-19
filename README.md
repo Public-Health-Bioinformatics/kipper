@@ -25,17 +25,17 @@ List versions of dbFile key/value pairs (by date/time): -l --list (optional)
 
 Initialize metadata file and kipper file: -M --rebuild
 
-    kipper.py [database file] -M [type of database:text|fasta]
+    kipper.py [data store file] -M [type of database:text|fasta]
 	kipper.py cpn60 -M fasta
     
 View metadata (json) file:  -m --metadata
 
-	kipper.py [database file] -m
+	kipper.py [data store file] -m
 	kipper.py cpn60 -m	
 
 Import key/value inserts/deletes based on import file (current date used):  -i --import
 
-	kipper.py [database file] -i [import file] -o.
+	kipper.py [data store file] -i [import file] -o.
 
 Outputs new master database to stdout; doesn't rewrite it.
 
@@ -45,9 +45,9 @@ Rewrites cpn60 with new version added.
 
 	kipper.py cpn60 -i sequences.fasta -o. 
 
-Add Volume to database (creates new volume file that receives future imports): -V --volume
+Add Volume to data store (creates new volume file that receives future imports): -V --volume
 
-	kipper.py [database file] -V -o. 
+	kipper.py [data store file] -V -o. 
 
 Rewrites cpn60 with new volume, and new version added to that volume.
 
@@ -55,15 +55,15 @@ Rewrites cpn60 with new volume, and new version added to that volume.
 
 Extract a version of the file based on given date/time: -e --extract
 
-	kipper.py [database file] -e -d datetime -o [output file]
+	kipper.py [data store file] -e -d datetime -o [output file]
 
 Extract a version of the file based on given version Id
 
-	kipper.py [database file] -e -n [version id] -o [output file]
+	kipper.py [data store file] -e -n [version id] -o [output file]
 
 Have database revert to previous version.  Drops future records, unmarks corresponding deletes:  -r --revert
 
-	kipper.py [database file] -r -d datetime -o [output file]
+	kipper.py [data store file] -r -d datetime -o [output file]
 
 
 Return version of the kipper code:	 -v --version 
@@ -72,15 +72,15 @@ Return version of the kipper code:	 -v --version
 
 ### **Options**
 
-  -h, --help
+-h, --help
 	
 	Show this help message and exit
   
-  -M INITIALIZE, --rebuild=INITIALIZE
+-M INITIALIZE, --rebuild=INITIALIZE
   
 	(Re)generate metadata file [name of db].md . Provide the type of db [text|fasta| etc.]
 	
-  -i DB_IMPORT_FILE_PATH, --import=DB_IMPORT_FILE_PATH
+-i DB_IMPORT_FILE_PATH, --import=DB_IMPORT_FILE_PATH
   
 	Import key/value inserts/deletes based on delta comparison with import file
 
@@ -92,35 +92,31 @@ Return version of the kipper code:	 -v --version
 
 	Have database revert to previous version (-d date/time required).  Drops future records, unmarks corresponding deletes.
 	
-  -m, --metadata
+-m, --metadata
 	  
 	  View metadata file [name of db].md
 	  
 -l, --list
   
 	List versions of dbFile key/value pairs (by date/time)
-  
--c, --check
-
-	Test an input file.  Provide the file name and path.
 
 -v, --version
 
 	Return version of kipper.py code.
   
-  -o DB_OUTPUT_FILE_PATH, --output=DB_OUTPUT_FILE_PATH
+-o DB_OUTPUT_FILE_PATH, --output=DB_OUTPUT_FILE_PATH
 	  
 	Output to this file.  Default is to stdio
   
-  -d DATETIME, --date=DATETIME
+-d DATETIME, --date=DATETIME
   
 	Provide date/time for sync, extract or revert operations.  Defaults to now.
-                        
-  -u UNIXTIME, --unixTime=UNIXTIME
+
+-u UNIXTIME, --unixTime=UNIXTIME
 
 	Provide Unix time (integer) for sync, extract or revert operations.
-                        
-  -n VERSION_ID, --number=VERSION_ID
+
+-n VERSION_ID, --number=VERSION_ID
   
 	Provide a version id to extract or revert to.
 
