@@ -6,8 +6,14 @@ The basic command-line file versioning solution we have created primarily for fa
 * "fasta" database, see http://en.wikipedia.org/wiki/FASTA_format
 
 ### **Usage**
- 
-By default, all outputs go to stdout and affect no change in Kipper data store files unless the output '-o' parameter is given with a data store file as the output target.  Thus by default one sees what would happen if an action were taken, but must take an additional step to affect the data store.  The exception to this is with the -M regenerate metadata command described below. 
+
+Kipper works off of a [data store name].md metadata file, and one or more [data store name]_[volume id] files.  Consequently any Kipper command begins with 
+
+	kipper.py [data store file]
+
+Alone, this will list the available versions found within a Kipper data store.
+
+By default, all outputs go to stdout (screen) and affect no change in Kipper data store files unless the output '-o' parameter is given with a data store file as the output target.  Thus by default one sees what would happen if an action were taken, but must take an additional step to affect the data store.  The exception to this is with the -M regenerate metadata command described below. 
 
 If you include a period in the "-o ." parameter, rather than a file name, this simply allows Kipper to select the default output file name as appropriate, namely:
 
@@ -21,17 +27,17 @@ As well, when -o parameter is a path, and not a specific filename, then kipper.p
 List versions of dbFile key/value pairs (by date/time): -l --list (optional)
 
 	kipper.py [data store file]
-	kipper.py cpn60 -l
+	`kipper.py cpn60 -l`
 
 Initialize metadata file and kipper file: -M --rebuild
 
-    kipper.py [data store file] -M [type of database:text|fasta]
-	kipper.py cpn60 -M fasta
+	kipper.py [data store file] -M [type of database:text|fasta]
+	`kipper.py cpn60 -M fasta`
     
 View metadata (json) file:  -m --metadata
 
 	kipper.py [data store file] -m
-	kipper.py cpn60 -m	
+	`kipper.py cpn60 -m`
 
 Import key/value inserts/deletes based on import file (current date used):  -i --import
 
@@ -39,11 +45,11 @@ Import key/value inserts/deletes based on import file (current date used):  -i -
 
 Outputs new master database to stdout; doesn't rewrite it.
 
-	kipper.py cpn60 -i sequences.fasta   
+	`kipper.py cpn60 -i sequences.fasta`   
 
 Rewrites cpn60 with new version added.
 
-	kipper.py cpn60 -i sequences.fasta -o. 
+	`kipper.py cpn60 -i sequences.fasta -o.`
 
 Add Volume to data store (creates new volume file that receives future imports): -V --volume
 
@@ -51,7 +57,7 @@ Add Volume to data store (creates new volume file that receives future imports):
 
 Rewrites cpn60 with new volume, and new version added to that volume.
 
-	kipper.py cpn60 -V -i sequences.fasta -o. 
+	`kipper.py cpn60 -V -i sequences.fasta -o.`
 
 Extract a version of the file based on given date/time: -e --extract
 
@@ -68,7 +74,7 @@ Have database revert to previous version.  Drops future records, unmarks corresp
 
 Return version of the kipper code:	 -v --version 
 
-    kipper.py -v
+	`kipper.py -v`
 
 ### **Options**
 
@@ -125,3 +131,11 @@ Return version of the kipper code:	 -v --version
 Kipper has virtually no memory requirements, regardless of the size of input files.  Since fasta databases are mainly just inserts over time, a Kipper data store having many versions usually ends up being modestly larger than the most recent fasta database version size.  Its version extraction speed is linear to the time it take to read and write the archive file.
 
 Currently we are experimenting with reading compressed files and writing compressed volume files, to see which archiving format is best.
+
+### **Notes**
+
+A change last year in NCBI's coding of alternate descriptions for a fasta sequence has impact on kipper data store file sizes for archives that span that date. It looks like NCBI converted all records last year to get away from the CTRL-A delimiter for alternate fasta descriptions, which now simply includes origina chevron.  There aren't any CTRL-A characters any more in incoming nt.fasta or nr.fasta files.  Instead one can expect to see    
+
+1       3       gi|74|emb|CAA39971.1|   annexin I [Bos taurus]^Agi|264182|gb|AAB25084.1| annexin ...
+
+3               gi|74|emb|CAA39971.1|   annexin I [Bos taurus] >gi|264182|gb|AAB25084.1| annexin ...
