@@ -13,7 +13,7 @@ and usually a metadata file:
 
 A volume file contains a range of versions starting with a complete version file that subsequent versions diff off of.  The reason for having separate volumes is that sometimes there can be a substantial change to all the entries in a database; as well by having a database broken into volumes, extraction for a particular volume doesn't have to involve a file that is much larger than the extracted version.
 
-The metadata file contains a json data serialization of the following fields.  Its structure has been designed to anticipate the need for key prefix files as outlined on the right.
+The metadata file contains a json data serialization of the following fields.
 
 Items in *italics* are not currently implemented.
 
@@ -31,7 +31,7 @@ Items in *italics* are not currently implemented.
 | volumes | yes | Table of volumes (see below).  Each volume contains a range of versions, starting with a complete version file that subsequent versions diff off of.
  | | | 
 
-### Volume
+#### Volume
 | field | required | description |
 |-------|----------|-------------|
 |floor_id | yes | Lowest version id that this volume pertains to.  It covers this id and all up to next volume's floor_id |
@@ -39,7 +39,7 @@ Items in *italics* are not currently implemented.
 | *prefixes* | *no* | *... keep track of the rows and hash of each prefix file?* |
  | | | 
  
-### Version
+#### Version
  
 | field | description |
 | ----- | ------------- |
@@ -62,8 +62,7 @@ In a volume each line of data contains 1 key-value record transaction, either an
 
 A kipper key-value record consists of:
 
- | creation version id | deletion version id | key (text) | value (text) |
- | ---------------------- | ---------------------- | ----------- | -------------- |
+    | creation version id | deletion version id | key (text) | value(text) |
 
 e.g.
 
