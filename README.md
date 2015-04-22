@@ -21,7 +21,7 @@ To import a new version of a fasta database into a Kipper data store, provide th
 
 If the "-o" parameter includes a period (e.g. "-o.") rather than a file name, this simply allows Kipper to select the default output file name as appropriate, namely:
 
-   **For --import or --revert actions: an update of the Kipper data store **
+   **For --import or --revert actions: an update of the Kipper data store.**
    **For -e --extract action: a save of output to the version file specified in the [data store name].md metadata file.**
 
 As well, when -o parameter is a path, and not a specific filename, then Kipper saves the appropriate output file name into the given folder.  This is convenient for extracting versions into separate folders.
