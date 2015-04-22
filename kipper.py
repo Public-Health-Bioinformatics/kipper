@@ -461,7 +461,11 @@ class Kipper(object):
 
 
 	def db_scan_line(self, db_key_value):
-
+		"""
+		FUTURE: transact_code will signal how key/value should be interpreted, to
+		allow for differential change storage from previous entries.
+		"""
+		# (created_vid, deleted_vid, transact_code, restofline) = db_key_value.split(self.delim,3)
 		(created_vid, deleted_vid, restofline) = db_key_value.split(self.delim,2)
 		if deleted_vid: deleted_vid = long(deleted_vid)
 		return (long(created_vid), deleted_vid, restofline)
@@ -469,8 +473,7 @@ class Kipper(object):
 
 	def version_extract(self, db_key_value):
 		(created_vid, deleted_vid, restofline) = self.db_scan_line(db_key_value)
-		
-		#if created_vid <= self.dateTime and (not deleted_vid or deleted_vid > self.dateTime):
+
 		if created_vid <= self.version_id and (not deleted_vid or deleted_vid > self.version_id):
 			return self.processor.postprocess_line(restofline)
 
@@ -482,8 +485,7 @@ class Kipper(object):
 		Reverting database here.
 		"""
 		(created_vid, deleted_vid, restofline) = self.db_scan_line(db_key_value)
-		
-		#if created_vid <= self.dateTime:
+
 		if created_vid <= self.version_id:
 			if (not deleted_vid) or deleted_vid <= self.version_id:
 				return [str(created_vid) + self.delim + str(deleted_vid) + self.delim + restofline] 
@@ -497,7 +499,8 @@ class Kipper(object):
 		"""
 		if options.unixTime != None:
 			try: 
-				_userTime = float(options.unixTime) # if its not a float, triggers exception
+				_userTime = float(options.unixTime) 
+				# if it is not a float, triggers exception
 			except ValueError:	
 				stop_err("Given Unix time could not be parsed [" + options.unixTime + "].  Format should be [integer]")
 
@@ -768,7 +771,7 @@ class Kipper(object):
 		"""
 		parser = MyParser(
 			description = 'Maintains versions of a file-based database with comparison to full-copy import file updates.',
-			usage = 'kipper.py [.kipper file] [options]',
+			usage = 'kipper.py [kipper database file] [options]*',
 			epilog="""
 			
 	All outputs go to stdout and affect no change in Kipper database unless the '-o' parameter is supplied.  (The one exception to this is when the -M regenerate metadata command is provided, as described below.)  Thus by default one sees what would happen if an action were taken, but must take an additional step to affect the data.
@@ -933,7 +936,8 @@ class VDBFastaProcessor(VDBProcessor):
 			
 		temp.close()
 		
-		#*** WARNING *** The locale specified by the environment affects sort order.
+		# Is this a consideration for natural sort in Python vs bash sort?:
+		# *** WARNING *** The locale specified by the environment affects sort order.
 		# Set LC_ALL=C to get the traditional sort order that uses native byte values.  
 		#-s stable; -f ignore case; V natural sort (versioning) ; -k column, -t tab delimiter
 		sort_a = subprocess.call(['sort', '-sfV', '-t\t', '-k1,1', '-o',temp.name, temp.name])
