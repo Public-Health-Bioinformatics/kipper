@@ -9,19 +9,22 @@ The basic command-line file versioning solution we have created primarily for fa
 
 Kipper works off of a [data store name].md metadata file, and one or more [data store name]_[volume id] files.  Consequently any Kipper command begins with 
 
-	kipper.py [data store file]
+	kipper.py [data store name]
 
 Alone, this will list the available versions found within a Kipper data store.
 
-By default, all outputs go to stdout (screen) and affect no change in Kipper data store files unless the output '-o' parameter is given with a data store file as the output target.  Thus by default one sees what would happen if an action were taken, but must take an additional step to affect the data store.  The exception to this is with the -M regenerate metadata command described below. 
+By default, all output goes to stdout (screen), and no changes to Kipper data store files are made.  Thus by default one sees what would happen if an action were taken, but must take an additional step to affect the data store.  The exception to this is with the -M regenerate metadata command described below. 
 
-If you include a period in the "-o ." parameter, rather than a file name, this simply allows Kipper to select the default output file name as appropriate, namely:
+To export a version of a kipper data store, pipe the extract output to a file via '> [file name]' or use the '-o' [file name] parameter.
 
-**"-o ." is a special parameter that leads to:**
-   **an update of the .kipper data store for --import or --revert actions**
-   **a save of output to file specified in the data store's .md metadata file for -e --extract action**
+To import a new version of a fasta database into a Kipper data store, provide the '-o' parameter with the full data store file name.
 
-As well, when -o parameter is a path, and not a specific filename, then kipper.py looks up what the appropriate output file name is according to the metadata file.
+If the "-o" parameter includes a period (e.g. "-o.") rather than a file name, this simply allows Kipper to select the default output file name as appropriate, namely:
+
+   **For --import or --revert actions: an update of the Kipper data store **
+   **For -e --extract action: a save of output to the version file specified in the [data store name].md metadata file.**
+
+As well, when -o parameter is a path, and not a specific filename, then Kipper saves the appropriate output file name into the given folder.  This is convenient for extracting versions into separate folders.
 
 
 List versions of dbFile key/value pairs (by date/time): -l --list (optional)
@@ -34,7 +37,7 @@ Initialize metadata file and kipper file: -M --rebuild
 	kipper.py [data store file] -M [type of database:text|fasta]
 	`kipper.py cpn60 -M fasta`
     
-View metadata (json) file:  -m --metadata
+View metadata (json) file: -m --metadata
 
 	kipper.py [data store file] -m
 	`kipper.py cpn60 -m`
@@ -131,6 +134,11 @@ Return version of the kipper code:	 -v --version
 Kipper has virtually no memory requirements, regardless of the size of input files.  Since fasta databases are mainly just inserts over time, a Kipper data store having many versions usually ends up being modestly larger than the most recent fasta database version size.  Its version extraction speed is linear to the time it take to read and write the archive file.
 
 Currently we are experimenting with reading compressed files and writing compressed volume files, to see which archiving format is best.
+
+### **Example Database**
+
+This repo contains a 'RDB_database_load_v10_8-v11_3.sh' script which downloads and imports the RDP RNA database (https://rdp.cme.msu.edu/) versions 10.18 to 11.3 into a kipper data store.  This takes a few hours to download and process.  The end result is 18 versions of the RDB database that fit into two kipper volumes.  The script needs wget and gunzip, and needs a symlink from say '/usr/local/bin/kipper' to the 'kipper.py' executable; and finally it needs a "master" folder to be created under the folder it is run from.
+
 
 ### **Notes**
 
