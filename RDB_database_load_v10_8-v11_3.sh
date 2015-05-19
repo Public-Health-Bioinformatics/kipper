@@ -16,7 +16,7 @@ ver="_v"
 db_name="rdp_rna"
 
 rm -f master/$db_name*
-keydb master/$db_name -M fasta
+kipper.py master/$db_name -M fasta
 
 for i in {18..29};
 do
@@ -27,11 +27,11 @@ do
 	gunzip $target.gz
 	touch -d "$modified" $target
 	# Submit as new version to Kipper; Kipper controls sorting.
-	kipper master/$db_name -i $target -o . -I "$base.$i"
+	kipper.py master/$db_name -i $target -o . -I "$base.$i"
 	rm $target
 done
 
-keydb master/$db_name -V -o .
+kipper.py master/$db_name -V -o .
 
 
 for i in {30..32};
@@ -42,7 +42,7 @@ do
     modified="$(date -r $target.gz)"
     gunzip $target.gz
     touch -d "$modified" $target
-    kipper master/$db_name -i $target -o . -I "$base.$i"
+    kipper.py master/$db_name -i $target -o . -I "$base.$i"
     rm $target
 done
 
@@ -58,7 +58,7 @@ do
     modified="$(date -r $target.gz)"
     gunzip $target.gz
     touch -d "$modified" $target
-    kipper master/$db_name -i $target -o . -I "$base.$i"
+    kipper.py master/$db_name -i $target -o . -I "$base.$i"
     rm $target
 
 done
