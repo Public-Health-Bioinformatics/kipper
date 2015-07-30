@@ -4,6 +4,6 @@ This development version is functionally identical to the master branch, but has
 
 Where Kipper v1.0.0 would store version changes in multiple text file rows, the new version 1.1.0 has exactly one text line for each key, and the version values are encoded in a (json) array containing for each version, a set of instructions for generating the value from the previous version's value, according to text deletion, inserts, and/or key removal.
 
-Also note that for speed, a natural sort is no longer employed.  Keys are sorted alphabetically, case sensitive.
+Also note that for speed, a natural sort is no longer employed.  Keys are sorted the default way, alphabetically, and case sensitive.
 
 We are testing this version and will release when we are confident of its behavour.
