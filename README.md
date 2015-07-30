@@ -137,7 +137,7 @@ Currently we are experimenting with reading compressed files and writing compres
 
 ### **Example Database**
 
-This repo contains a 'RDB_database_load_v10_8-v11_3.sh' script which downloads and imports the RDP RNA database (https://rdp.cme.msu.edu/) versions 10.18 to 11.3 into a kipper data store.  This takes a few hours to download and process.  The end result is 18 versions of the RDB database that fit into two kipper volumes.  The script needs wget and gunzip, and needs a symlink from say '/usr/local/bin/kipper' to the 'kipper.py' executable; and finally it needs a "master" folder to be created under the folder it is run from.
+This repo contains a 'RDB_database_load_v10_8-v11_3.sh' script which downloads and imports the RDP RNA database (https://rdp.cme.msu.edu/) versions 10.18 to 11.3 into a kipper data store.  This takes a few hours to download and process.  The end result is 18 versions of the RDB database that fit into two kipper volumes.  The script needs wget and gunzip, and needs a symlink from say '/usr/local/bin/kipper' to the 'kipper.py' executable.
 
 
 ### **Notes**
