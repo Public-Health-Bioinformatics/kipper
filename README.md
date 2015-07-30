@@ -1,6 +1,6 @@
 ## Kipper v1.0.0
 
-The basic command-line file versioning solution we have created primarily for fasta data, called **Kipper**, is a key-value data store that keeps track of when particular items are inserted or deleted (updates are deletes followed by inserts).  It can recall versions by date or version id.  It can keep versions in one or more volume files.  It currently only accepts two kinds of text file input : 
+The basic command-line file versioning solution we have created primarily for fasta data, called **Kipper**, is a key-value data store that keeps track of when particular items are inserted or deleted (updates are deletes followed by inserts).  It can recall versions by date or version id.  It can keep versions in one or more volume files.  It currently accepts two kinds of text file input : 
 
 * "text": any file where each row is a tab/space delimited key-value record.
 * "fasta" database, see http://en.wikipedia.org/wiki/FASTA_format
