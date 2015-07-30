@@ -14,11 +14,12 @@ import tempfile
 import json
 import glob
 import gzip
+#https://code.google.com/p/google-diff-match-patch/wiki/API
+import diff_match_patch as dmp_module
+import six # A step towards python 3.0 compatibility
 
 
-
-
-CODE_VERSION = '1.0.0'
+CODE_VERSION = '1.1.0'
 REGEX_NATURAL_SORT = re.compile('([0-9]+)')
 KEYDB_LIST = 1
 KEYDB_EXTRACT = 2
@@ -46,8 +47,10 @@ class Kipper(object):
 		self.db_master_file_path = None
 		self.metadata_file_path = None		
 		self.db_import_file_path = None
-		self.output_file = None # By default, printed to stdout
+		self.output = None # Either a file or stdout
+		self.output_file = None # File path
 		self.volume_id = None
+		self.version = None
 		self.version_id = None # Note, this is natural #, starts from 1; 
 		self.metadata = None
 		self.options = None
@@ -59,7 +62,7 @@ class Kipper(object):
 		self.delim = "\t"
 		self.nl = "\n"
 	
-	
+
 	def __main__(self):
 		"""
 		Handles all command line options for creating kipper archives, and extracting or reverting to a version.
@@ -156,7 +159,7 @@ class Kipper(object):
 						output_name = output_name[0:-3]
 				self.output_file = os.path.join(self.output_file, output_name)
 
-			self.db_scan_action(KEYDB_EXTRACT)
+			self.db_action_extract()
 			return
 
 		if options.revert == True: 
@@ -166,7 +169,7 @@ class Kipper(object):
 			# Send database back to given revision
 			if self.output_file and self.output_file == os.path.dirname(self.db_master_file_path):
 				self.output_file = self.get_db_path() 
-			self.db_scan_action(KEYDB_REVERT)
+			self.db_action_revert()
 			return
 	
 		# Default to list datastore versions
@@ -195,6 +198,9 @@ class Kipper(object):
 
 	 
 	def get_list(self):	
+		"""
+		Default listing of volumes and versions
+		"""
 		volumes = self.metadata['volumes']
 		for ptr in range(0, len(volumes)):
 			volume = volumes[ptr]
@@ -237,21 +243,23 @@ class Kipper(object):
 			dbReader = bigFileReader(volume)
 			version_ids = []
 			db_key_value = dbReader.read()				
-			old_key = ''
 			while db_key_value:
 
-				(created_vid, deleted_vid, db_key, restofline) = db_key_value.split(self.delim, 3)
-				version = versions[self.version_dict_lookup(version_ids, long(created_vid), import_modified)]
-				version['rows'] +=1
-				if old_key != db_key:
-					version['keys'] +=1
-					old_key = db_key
+				(db_key, created_vid, restofline) = self.db_scan_line(db_key_value)
 
-				version['inserts'] += 1
-				if deleted_vid:
-					version = versions[self.version_dict_lookup(version_ids, long(deleted_vid), import_modified)]
-					version['deletes'] += 1
-				
+				transactions = json.loads(restofline)
+				for (ptr, transaction) in enumerate(transactions):
+
+					version = versions[self.version_dict_lookup(version_ids, transaction[0], import_modified)]
+					if len(transaction) == 1: 
+						version['deletes'] += 1
+					else: 
+						version['keys'] +=1
+						if ptr == 0:
+							version['inserts'] += 1
+						else:
+							version['updates'] += 1
+
 				db_key_value = dbReader.read()
 
 			# Reorder, and reassign numeric version ids:
@@ -369,7 +377,8 @@ class Kipper(object):
 			'file_size': file_size,
 			'inserts': 0,
 			'deletes': 0,
-			'rows': 0,
+			'updates': 0,
+			# 'rows': 0,
 			'keys': 0
 		}
 		self.metadata['volumes'][-1]['versions'].append(version)
@@ -408,92 +417,126 @@ class Kipper(object):
 
 	#****************** Methods Involving Scan of Master Kipper file **********************
 
-	def db_scan_action (self, action):
+	def db_action_extract (self):
 		"""
-		#Python 2.6 needs this reopened if it was previously closed.
+		#STDOUT Issue: Python 2.6 needs this reopened if it was previously closed.
 		#sys.stdout = open("/dev/stdout", "w")
 		"""
 		dbReader = bigFileReader(self.get_db_path())
 		# Setup temp file:
-		if self.output_file:
-			temp_file = self.get_temp_output_file(action=action)
+		if self.output_file: temp_file = self.get_temp_output_file(action=KEYDB_EXTRACT)
 		
 		# Use temporary file so that db_output_file_path switches to new content only when complete
-		with (temp_file if self.output_file else sys.stdout) as output:
+		with (temp_file if self.output_file else sys.stdout) as self.output:
 			db_key_value = dbReader.read()
-				
+			
 			while db_key_value:
-				if action == KEYDB_EXTRACT:
-					okLines = self.version_extract(db_key_value)
-				
-				elif action == KEYDB_REVERT:
-					okLines = self.version_revert(db_key_value)
+				# Old version: only one of the lines would match a particular version id.
+				# New version: process each line until past self.version_id
 
-				if okLines:
-					output.writelines(okLines)
-					 
-				db_key_value = dbReader.read()		
+				(dbKey, created_vid, restofline) = self.db_scan_line(db_key_value)
+
+				#If we have an item that has creation <= retrieval version,
+				if created_vid <= self.version_id:
+					transactions = json.loads(restofline)
+					dbValue = '' # Begin building value
+					delete = False
+					for (transaction) in transactions:
+						if transaction[0] <= self.version_id: 
+							if len(transaction) == 1: 
+								delete = True
+								dbValue = '' #Start from beginning
+							else: 
+								delete = False
+								dbValue = self.diff_apply_patch(dbValue, transaction[1])
+						else:
+							break
+
+
+					if not delete: # If this isn't a fresh delete, write it
+						self.output.writelines(self.processor.postprocess_line(dbKey + self.delim + dbValue))
+
+				db_key_value = dbReader.read()	
+
+		# Postprocess and swap temp file back into named output file
+		if self.output_file:		
+			self.processor.postprocess_file(temp_file.name)
+			os.rename(temp_file.name, self.output_file)					
+
+
+
+	def db_action_revert (self):
+		"""
+		Revert volumes and metadata back to a particular version (self.version_id)
+		"""
+		dbReader = bigFileReader(self.get_db_path())
+
+		if self.output_file: temp_file = self.get_temp_output_file(action=KEYDB_REVERT)
+		
+		with (temp_file if self.output_file else sys.stdout) as self.output:
+			db_key_value = dbReader.read()
+
+			while db_key_value:
+
+				(dbKey, created_vid, restofline) = self.db_scan_line(db_key_value)
+
+				#If we have an item that has creation <= revert version,
+				if created_vid <= self.version_id:
+					transactions = json.loads(restofline)
+
+					for (ptr, transaction) in enumerate(transactions):
+						# As soon as we encounter our first transaction happened after
+						# revert version, chop transactions back to that point.
+						if (transaction[0] > self.version_id): 
+							transactions = transactions[0:ptr]
+							break
+
+					dbValue = json.dumps(transactions, separators=(',',':'))
+					self.db_output_write(dbKey, str(created_vid), dbValue)
+
+				db_key_value = dbReader.read()
+
 
 		# Issue: metadata lock while quick update with output_file???
 		if self.output_file:		
-			if action == KEYDB_EXTRACT:
-				self.processor.postprocess_file(temp_file.name)
 
-			# Is there a case where we fail to get to this point?
-			os.rename(temp_file.name, self.output_file)
+			self.volume_revert() # Side effect required: revert triggers change in metadata
+			os.rename(temp_file.name, self.output_file)					
 
-			if action == KEYDB_REVERT:
-				# When reverting, clear all volumes having versions > self.version_id
-				# Takes out volume structure too.
-				volumes = self.metadata['volumes']
-				for volptr in range(len(volumes)-1, -1, -1):
-					volume = volumes[volptr]
-					if volume['floor_id'] > self.version_id: #TO REVERT IS TO KILL ALL LATER VOLUMES.
-						os.remove(self.get_db_path(volume['id']))	
-					versions = volume['versions']
-					for verptr in range(len(versions)-1, -1, -1):
-						if	versions[verptr]['id'] > self.version_id:
-							popped = versions.pop(verptr)
-					if len(versions) == 0 and volptr > 0:
-						volumes.pop(volptr)
-					
-			self.write_metadata(self.metadata)
+
+	def db_output_write(self, dbKey, created_vid, dbValue):
+
+		self.output.write(dbKey + self.delim + str(created_vid) + self.delim + dbValue + self.nl)
 
 
 	def db_scan_line(self, db_key_value):
 		"""
-		FUTURE: transact_code will signal how key/value should be interpreted, to
-		allow for differential change storage from previous entries.
 		"""
-		# (created_vid, deleted_vid, transact_code, restofline) = db_key_value.split(self.delim,3)
-		(created_vid, deleted_vid, restofline) = db_key_value.split(self.delim,2)
-		if deleted_vid: deleted_vid = long(deleted_vid)
-		return (long(created_vid), deleted_vid, restofline)
+		(key, created_vid, restofline) = db_key_value.split(self.delim,2)
+		return (key, long(created_vid), restofline)
 
 
-	def version_extract(self, db_key_value):
-		(created_vid, deleted_vid, restofline) = self.db_scan_line(db_key_value)
 
-		if created_vid <= self.version_id and (not deleted_vid or deleted_vid > self.version_id):
-			return self.processor.postprocess_line(restofline)
+	def volume_revert(self):
+		'''
+		Revise metadata to only include volumes/versions up to given version_id
+		'''
+		# Clear all volumes having versions > self.version_id
+		volumes = self.metadata['volumes']
+		for volptr in range(len(volumes)-1, -1, -1):
+			volume = volumes[volptr]
+			if volume['floor_id'] > self.version_id: 
+				# Delete all later volume files.
+				os.remove(self.get_db_path(volume['id']))	
+			versions = volume['versions']
+			for verptr in range(len(versions)-1, -1, -1):
+				if	versions[verptr]['id'] > self.version_id:
+					popped = versions.pop(verptr)
+			if len(versions) == 0 and volptr > 0:
+				volumes.pop(volptr)
+		self.write_metadata(self.metadata)
 
-		return False
 
-
-	def version_revert(self, db_key_value):
-		"""
-		Reverting database here.
-		"""
-		(created_vid, deleted_vid, restofline) = self.db_scan_line(db_key_value)
-
-		if created_vid <= self.version_id:
-			if (not deleted_vid) or deleted_vid <= self.version_id:
-				return [str(created_vid) + self.delim + str(deleted_vid) + self.delim + restofline] 
-			else:
-				return [str(created_vid) + self.delim + self.delim + restofline] 
-		return False
-		
-		
 	def check_date_input(self, options):
 		"""
 		"""
@@ -550,9 +593,11 @@ class Kipper(object):
 
 
 	def check_file_path(self, file, message = "File "):
-		
+		""" 
+			Converts path if it is relative, to an absolute one.
+		"""
 		path = os.path.normpath(file)
-		# make sure any relative paths are converted to absolute ones
+
 		if not os.path.isdir(os.path.dirname(path)) or not os.path.isfile(path): 
 			# Not an absolute path, so try default folder where script was called:
 			path = os.path.normpath(os.path.join(os.getcwd(),path) )
@@ -593,7 +638,10 @@ class Kipper(object):
 		temp Kipper version which is copied over to main database on completion.
 		
 		Import algorithm only works if the import file is already sorted in the same way as the Kipper database file
-			
+		DATABASE KEY entry has value which encodes differential changes for all versions. 
+		It also includes a "x:1" delete flag to indicate if a particular version no longer has 
+		key
+
 		@uses self.db_import_file_path string	A file full of one line key[tab]value records.
 		@uses self.output_file string	A file to save results in.  If empty, then stdio.
 		
@@ -602,8 +650,6 @@ class Kipper(object):
 	
 		@param file_name name of file being imported.  This is stored in version record so that output file will be the same.
 		"""
-		delim = self.delim		
-
 
 		file_size = os.path.getsize(self.db_import_file_path)
 		if version_index == None:
@@ -618,125 +664,159 @@ class Kipper(object):
 			if os.path.isdir(self.output_file):  
 				self.output_file = self.get_db_path()
 	
-		version = self.metadata_create_version(import_modified, file_name, file_size, version_index)
-		version_id = str(version['id'])
-			
-		with (temp_file if self.output_file else sys.stdout) as outputFile : 
+		# Add new version identifier to metadata
+		self.version = self.metadata_create_version(import_modified, file_name, file_size, version_index)
+
+		# VERSION KEYS COUNT COULD BE INITIALIZED FROM PREVIOUS VERSION TO SUPPORT DIFF IMPORT.
+		# version['keys'] = ...
+
+		with (temp_file if self.output_file else sys.stdout) as self.output : 
 			dbReader = bigFileReader(self.get_db_path())
 			importReader = bigFileReader(self.db_import_file_path)
 			old_import_key=''
 
 			while True:
 				
-				db_key_value = dbReader.turn()
-				#if import_key_value
 				import_key_value = importReader.turn()
 				
 				# Skip empty or whitespace lines:
 				if import_key_value and len(import_key_value.lstrip()) == 0:
 					import_key_value = importReader.read()
-					continue
-					
+					continue	
+
+
+				# If no dbReader.step(), then db_key_value is same as old, so skip reparsing.
+				if dbReader.take_step:
+					db_key_value = dbReader.turn()
+					if db_key_value:
+						(dbKey, created_vid, dbTransactionStr) = self.db_scan_line(db_key_value)
+
+
 				if not db_key_value: # eof
-					while import_key_value: # Insert remaining import lines:
-						(import_key, import_value) = self.get_key_value(import_key_value)	
-						outputFile.write(version_id + delim + delim + import_key + delim + import_value)
-						import_key_value = importReader.read() 
-						version['inserts'] += 1
-						version['rows'] += 1
+					self.import_file_remaining(importReader, import_key_value) 							
+					break # Both files now processed
 
-						if import_key != old_import_key:
-							version['keys'] += 1
-							old_import_key = import_key
-
-					break # Both inputs are eof, so exit
-
-				elif not import_key_value: # db has key that import file no longer has, so mark each subsequent db line as a delete of the key (if it isn't already)
-					while db_key_value:
-						(created_vid, deleted_vid, dbKey, dbValue) = db_key_value.split(delim,3)
-						version['rows'] += 1
-
-						if deleted_vid:
-							outputFile.write(db_key_value)
-						else:
-							outputFile.write(created_vid + delim + version_id + delim +  dbKey + delim + dbValue)
-							version['deletes'] += 1
-
-						db_key_value = dbReader.read()
+				elif not import_key_value: 
+					self.import_db_remaining(dbReader, db_key_value)
 					break
 				
+				(import_key, import_value) = self.get_key_value(import_key_value)
+
+				# Subsequent instances of any duplicated key are ignored:
+				if import_key == old_import_key:
+					old_import_key = import_key
+					importReader.step()
+					continue
+				
+
+				if import_key == dbKey:
+					
+					# Calculate current value 
+					(dbValue, transactions) = self.diff_apply_transactions(dbTransactionStr)
+
+					# Now we have latest db Value to compare input with
+					if import_value == dbValue: 
+						# No change in key value.  SHORTCUT write.
+						self.output.write(db_key_value)
+						self.version['keys'] += 1
+					
+					# Case where value changed: add update transaction
+					else: 
+						self.import_write_update(dbKey, dbValue, import_value, transactions)
+
+					dbReader.step()
+					importReader.step()
+
 				else:
-					(import_key, import_value) = self.get_key_value(import_key_value)						
-					(created_vid, deleted_vid, dbKey, dbValue) = db_key_value.split(delim,3)
+					# Find out whether db key preceeds import key (if so its a delete)
+					# Natural sort doesn't do text sort on numeric parts, ignores capitalization.
+					# dbKeySort = natural_sort_key(dbKey)
+					# import_keySort = natural_sort_key(import_key)
+					# False if dbKey less; Means dbKey is no longer in import file, so delete 
+					if dbKey < import_key:
 
-					if import_key != old_import_key:
-						version['keys'] += 1
-						old_import_key = import_key
-					
-					# All cases below lead to writing a row ...
-					version['rows'] += 1
+						self.import_write_delete(db_key_value)
+						dbReader.step() # Check if next dbKey matches import_key
 
-					if import_key == dbKey:
-						# When the keys match, we have enough information to act on the current db_key_value content; 
-						# therefore ensure on next pass that we read it.
-						dbReader.step()
+					else: # DB key is greater, so we haven't seen this import_key before.
 						
-						if import_value == dbValue:
-							outputFile.write(db_key_value)
-
-							# All past items marked with insert will also have a delete.  Step until we find one
-							# not marked as a delete... or a new key.
-							if deleted_vid: # Good to go in processing next lines in both files.
-								pass
-							else:
-								importReader.step()
-								
-						else: # Case where value changed - so process all db_key_values until key no longer matches.  
-
-							# Some future pass will cause import line to be written to db 
-							# (when key mismatch occurs) as long as we dont advance it (prematurely).							
-							if deleted_vid: 
-								#preserve deletion record.
-								outputFile.write(db_key_value) 
-								
-							else:
-								# Mark record deletion
-								outputFile.write(created_vid + delim + version_id + delim + dbKey + delim + dbValue)
-								version['deletes'] += 1
-								# Then advance since new key/value means new create 
-
-					else:
-						# Natural sort doesn't do text sort on numeric parts, ignores capitalization.
-						dbKeySort = natural_sort_key(dbKey)
-						import_keySort = natural_sort_key(import_key)
-						# False if dbKey less; Means db key is no longer in sync db, 
-						if cmp(dbKeySort, import_keySort) == -1:
-					
-							if deleted_vid: #Already marked as a delete
-								outputFile.write(db_key_value)
-								
-							else:	# Write dbKey as a new delete
-								outputFile.write(created_vid + delim + version_id + delim + dbKey + delim + dbValue)
-								version['deletes'] += 1
-							# Advance ... there could be another db_key_value for deletion too.
-							dbReader.step() 
-
-						else: #DB key is greater, so insert import_key,import_value in db.
-							# Write a create record
-							outputFile.write(version_id + delim + delim + import_key + delim + import_value)
-							version['inserts'] += 1
-							importReader.step() # Now compare next two candidates.
+						self.import_write_create(import_key, import_value)
+						importReader.step() # Now compare next two candidates.
 
 		if self.output_file:
 			# Kipper won't write an empty version - since this is usually a mistake.
 			# If user has just added new volume though, then slew of inserts will occur
 			# even if version is identical to tail end of previous volume version.
-			if version['inserts'] > 0 or version['deletes'] > 0:
-				#print "Temp file:" + temp_file.name
+			# I.e. Kipper only writes new version if at least one insert or delete occured.
+			if self.version['inserts'] > 0 or self.version['deletes'] > 0 or self.version['updates'] > 0:
 				os.rename(temp_file.name, self.output_file)
 				self.write_metadata(self.metadata)
 			else:
 				os.remove(temp_file.name)
+
+
+	def import_file_remaining(self, importReader, import_key_value):
+		'''
+		 Insert remaining import file lines
+		'''
+		old_import_key = ''
+		while import_key_value: 
+			(import_key, import_value) = self.get_key_value(import_key_value)	
+			
+			if import_key != old_import_key:
+				self.import_write_create(import_key, import_value)
+				old_import_key = import_key
+
+			import_key_value = importReader.read() 							
+
+
+	def import_db_remaining(self, dbReader, db_key_value):
+		'''
+		Delete remaining db key values (if not already deleted) since import file ended
+		''' 
+		while db_key_value:
+
+			self.import_write_delete(db_key_value)
+			db_key_value = dbReader.read()
+
+
+	def import_write_delete(self, db_key_value):
+
+			(dbKey, created_vid, dbValue) = self.db_scan_line(db_key_value)
+			transactions = json.loads(dbValue)
+
+			# If last transaction for this item has no delta, then it's already a delete
+			if len(transactions[-1]) == 1:
+
+				self.output.write(db_key_value)
+
+			else:
+
+				transactions.append([self.version['id']])
+				dbValue = json.dumps(transactions, separators=(',',':')) 
+				self.db_output_write(dbKey, created_vid, dbValue)
+
+				self.version['deletes'] += 1
+				self.version['keys'] -= 1
+
+
+	def import_write_create(self, import_key, import_value):
+		# Create a new import_key/value record in db.
+		transactions = [[self.version['id'], self.diff_make_patch('',import_value) ]]
+		dbValue = json.dumps(transactions, separators=(',',':')) 
+		self.db_output_write(import_key, self.version['id'], dbValue)
+
+		self.version['inserts'] += 1
+		self.version['keys'] += 1
+
+
+	def import_write_update(self, dbKey, dbValue, import_value, transactions):
+
+		transactions.append([self.version['id'], self.diff_make_patch(dbValue, import_value)])
+		dbValue = json.dumps(transactions, separators=(',',':')) 
+		self.db_output_write(dbKey, transactions[0][0], dbValue)
+
+		self.version['updates'] += 1
 
 
 	def get_last_version(self):
@@ -750,14 +830,67 @@ class Kipper(object):
 				return versions[-1]['id']
 				
 		return 0	
-				
-		
-	# May want to move this to individual data store processor since it can be sensitive to different kinds of whitespace then.
+
+
 	def get_key_value(self, key_value):	
-		# ACCEPTS SPLIT AT ANY WHITESPACE PAST KEY BY DEFAULT
+		'''
+		ACCEPTS SPLIT AT ANY WHITESPACE PAST KEY BY DEFAULT
+		May want to move this to individual data store processor since it can be sensitive to different kinds of whitespace then.
+		'''
 		kvparse = key_value.split(None,1)
-		#return (key_value[0:kvptr], key_value[kvptr:].lstrip())
 		return (kvparse[0], kvparse[1] if len(kvparse) >1 else '')
+
+
+	def diff_make_patch (self, stringOld, stringNew):
+		"""
+			Compare old and new strings, formulate differential description of the text deleted, added, or replaced
+		"""
+		matcher = dmp_module.diff_match_patch()
+		diff = matcher.diff_main(stringOld, stringNew)
+		matcher.diff_cleanupEfficiency(diff)
+
+		# Convert diff array into form that is set up just to operate on previous string version.
+		patch = []
+		for (act, value) in diff:
+			if act == 1: patch.append(value) # Inserted string
+			elif act == 0: patch.append(len(value)) # Unchanged
+			else: patch.append(-len(value)) # Delete
+
+		return patch # json.dumps(patch, separators=(',',':'))    
+
+
+	def diff_apply_patch (self, oldstr, patch):
+		'''
+		Patch is an array of commands:
+		 - a string to insert
+		 - a positive # to copy characters from oldstr through
+		 - a negative # to skip characters from oldstr
+		'''
+		newstr = ""
+		oldPtr = 0
+		for item in patch:
+			if isinstance( item, six.string_types ):
+				newstr += item
+			elif item >= 0:
+				newstr += str(oldstr[oldPtr:oldPtr+item])
+				oldPtr += item
+			else:
+				oldPtr += -item # OldPtr is negative, so skip positive # chars.
+
+		return newstr
+
+
+	def diff_apply_transactions(self, dbValue):
+
+		value = '' # Begin building value.  Shortcut on this test?
+		transactions = json.loads(dbValue)
+		for (transaction) in transactions:
+			if len(transaction) == 1: 
+				value = '' #Start from beginning
+			else: 
+				value = self.diff_apply_patch(value, transaction[1])
+
+		return (value, transactions)
 
 
 	def dateISOFormat(self, atimestamp):
@@ -871,7 +1004,9 @@ class VDBProcessor(object):
 		temp = tempfile.NamedTemporaryFile(mode='w+t',delete=False, dir=os.path.dirname(file_path) )
 		copy (file_path, temp.name)
 		temp.close()
-		sort_a = subprocess.call(['sort','-sfV','-t\t','-k1,1', '-o',temp.name, temp.name])
+		env = os.environ.copy()
+		env['LC_ALL'] = 'C'
+		sort_a = subprocess.call(['sort','-s','-t\t','-k1,1', '-o',temp.name, temp.name], env=env)
 		return temp #Enables temp file name to be used by caller.
 		
 
@@ -884,8 +1019,8 @@ class VDBProcessor(object):
 		# Ensures "[key]	[value]" entries are sorted
 		# "sort --check ..." returns nothing if sorted, or e.g "sort: sequences_A.fastx.sorted:12: disorder: >114 AJ009959.1 … "
 
-		# if not subprocess.call(['sort','--check','-V',db_import_file_path]): #very fast check
-		#	subprocess.call(['sort','-V',db_import_file_path]):
+		# if not subprocess.call(['sort','--check','-sfV',db_import_file_path]): #very fast check
+		#	subprocess.call(['sort','-sfV',db_import_file_path]):
 	
 		return True
 		
@@ -940,7 +1075,9 @@ class VDBFastaProcessor(VDBProcessor):
 		# *** WARNING *** The locale specified by the environment affects sort order.
 		# Set LC_ALL=C to get the traditional sort order that uses native byte values.  
 		#-s stable; -f ignore case; V natural sort (versioning) ; -k column, -t tab delimiter
-		sort_a = subprocess.call(['sort', '-sfV', '-t\t', '-k1,1', '-o',temp.name, temp.name])
+		env = os.environ.copy()
+		env['LC_ALL'] = 'C'
+		sort_a = subprocess.call(['sort', '-s', '-t\t', '-k1,1', '-o',temp.name, temp.name], env=env)
 
 		return temp #Enables temp file name to be used by caller.
 		
@@ -956,9 +1093,12 @@ class VDBFastaProcessor(VDBProcessor):
 		# Set up ">[accession id] [description]\n" :
 		fasta_header = '>' + ' '.join(line_data[0:2]) + '\n'
 		# Put fasta sequences back into multi-line; note trailing item has newline.
-		sequences= self.split_len(line_data[2],80)
-		if len(sequences) and sequences[-1].strip() == '':
-			sequences[-1] = ''			
+		if len(line_data) > 1:
+			sequences= self.split_len(line_data[2],80)
+			if len(sequences) and sequences[-1].strip() == '':
+				sequences[-1] = ''
+		else:
+			sequences = []
 
 		return fasta_header + '\n'.join(sequences)
 
@@ -975,7 +1115,7 @@ class bigFileReader(object):
 	database are feeding lines into a new database.
 	 
 	Interestingly, using readlines() with byte hint parameter less 
-	than file size improves performance by at least 30% over readline().
+	than file size seems to improve performance by at least 30% over readline().
 
 	FUTURE: Adjust buffer lines dynamically based on file size/lines ratio?
 	"""
@@ -1040,15 +1180,18 @@ class bigFileReader(object):
 
 
 
-# Enables use of with ... syntax.  See https://mail.python.org/pipermail/tutor/2009-November/072959.html
 class myGzipFile(gzip.GzipFile):
-    def __enter__(self):
-        if self.fileobj is None:
-            raise ValueError("I/O operation on closed GzipFile object")
-        return self
+	"""
+	# Enables use of "with [expression]:" syntax.  
+	See https://mail.python.org/pipermail/tutor/2009-November/072959.html
+	"""
+	def __enter__(self):
+		if self.fileobj is None:
+			raise ValueError("I/O operation on closed GzipFile object")
+		return self
 
-    def __exit__(self, *args):
-        self.close()
+	def __exit__(self, *args):
+		self.close()
 
 
 def natural_sort_key(s, _nsre = REGEX_NATURAL_SORT):
@@ -1056,28 +1199,26 @@ def natural_sort_key(s, _nsre = REGEX_NATURAL_SORT):
 		for text in re.split(_nsre, s)] 
 
 
-def generic_linux_sort(self):
+def generic_linux_sort(self, aList):
 	import locale
 	locale.setlocale(locale.LC_ALL, "C")
-	yourList.sort(cmp=locale.strcoll)
+	aList.sort(cmp=locale.strcoll)
 
 
 def parse_date(adate):
 	"""
 	Convert human-entered time into linux integer timestamp
+	This handles UTC & daylight savings exactly
 
 	@param adate string Human entered date to parse into linux time
-
 	@return integer Linux time equivalent or 0 if no date supplied
 	"""
 	adate = adate.strip()
-	if adate > '':
-	    adateP = parser2.parse(adate, fuzzy=True)
-	    #dateP2 = time.mktime(adateP.timetuple())
-	    # This handles UTC & daylight savings exactly
-	    return calendar.timegm(adateP.timetuple())
-	return 0
+	if adate == '':return 0
 
+	adateP = parser2.parse(adate, fuzzy=True)
+	return calendar.timegm(adateP.timetuple())
+	
 
 if __name__ == '__main__':
 
