@@ -15,6 +15,7 @@ ver="_v"
 
 db_name="rdp_rna"
 
+mkdir master
 rm -f master/$db_name*
 kipper master/$db_name -M fasta
 
