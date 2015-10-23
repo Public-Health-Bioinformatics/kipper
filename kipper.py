@@ -936,12 +936,23 @@ class VDBFastaProcessor(VDBProcessor):
 			
 		temp.close()
 		
+		import stat
+		
+		# TEST sort failure: set it so temp file is read only.
+		#mode = os.stat(temp.name)[stat.ST_MODE]
+		#os.chmod(temp.name,mode & ~0222)
+		
 		# Is this a consideration for natural sort in Python vs bash sort?:
 		# *** WARNING *** The locale specified by the environment affects sort order.
 		# Set LC_ALL=C to get the traditional sort order that uses native byte values.  
 		#-s stable; -f ignore case; V natural sort (versioning) ; -k column, -t tab delimiter
-		sort_a = subprocess.call(['sort', '-sfV', '-t\t', '-k1,1', '-o',temp.name, temp.name])
-
+		try:
+			subprocess.check_call(['sort', '-sfV', '-t\t', '-k1,1', '-o',temp.name, temp.name])
+		except subprocess.CalledProcessError as e:
+			stop_err("Error: Sort of import file could not be completed, sort() returned error code " + str(e.returncode) )
+		except OSError as e:
+			stop_err("Error: Sort of import file could not be completed, sort command or %s file not found?" % temp.name)
+			
 		return temp #Enables temp file name to be used by caller.
 		
 		
