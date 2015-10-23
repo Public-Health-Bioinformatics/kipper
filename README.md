@@ -142,7 +142,7 @@ This repo contains a 'RDB_database_load_v10_8-v11_3.sh' script which downloads a
 
 ### **Notes**
 
-A change last year in NCBI's coding of alternate descriptions for a fasta sequence has impact on kipper data store file sizes for archives that span that date. It looks like NCBI converted all records last year to get away from the CTRL-A delimiter for alternate fasta descriptions, which now simply includes origina chevron.  There aren't any CTRL-A characters any more in incoming nt.fasta or nr.fasta files.  Instead one can expect to see    
+A change last year in NCBI's coding of alternate descriptions for a fasta sequence has impact on kipper data store file sizes for archives that span that date. It looks like NCBI converted all records last year to get away from the CTRL-A delimiter for alternate fasta descriptions, which now simply includes original chevron.  There aren't any CTRL-A characters any more in incoming nt.fasta or nr.fasta files.  Consequently one can expect to see manu updates like:
 ```
 1       3       gi|74|emb|CAA39971.1|   annexin I [Bos taurus]^Agi|264182|gb|AAB25084.1| annexin ...
 3               gi|74|emb|CAA39971.1|   annexin I [Bos taurus] >gi|264182|gb|AAB25084.1| annexin ...
