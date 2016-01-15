@@ -1,7 +1,7 @@
 Source Code License
 
 An Open Source Initiative (OSI) approved license
-ffp_phylogeny source code is licensed under the Academic Free License version 3.0.
+Public-Health-Bioinformatics Kipper source code is licensed under the Academic Free License version 3.0.
 
 Licensed under the Academic Free License version 3.0
 
