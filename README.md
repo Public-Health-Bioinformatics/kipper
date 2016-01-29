@@ -15,11 +15,7 @@ Alone, this will list the available versions found within a Kipper data store.
 
 By default, all output goes to stdout (screen), and no changes to Kipper data store files are made.  Thus by default one sees what would happen if an action were taken, but must take an additional step to affect the data store.  The exception to this is with the -M regenerate metadata command described below. 
 
-To export a version of a kipper data store, pipe the extract output to a file via '> [file name]' or use the '-o' [file name] parameter.
-
-To import a new version of a fasta database into a Kipper data store, provide the '-o' parameter with the full data store file name.
-
-If the "-o" parameter includes a period (e.g. "-o.") rather than a file name, this simply allows Kipper to select the default output file name as appropriate, namely:
+To export a version of a kipper data store, pipe the extract output to a file via '> [file name]' or use the '-o' [file name] parameter.  If the "-o" parameter includes a period (e.g. "-o.") rather than a file name, this simply allows Kipper to select the default output file name as appropriate, namely:
 
 	For -i --import or -r --revert actions: an update of the Kipper data store.
 	For -e --extract action: a save of output to the version file specified in the [data store name].md metadata file.
